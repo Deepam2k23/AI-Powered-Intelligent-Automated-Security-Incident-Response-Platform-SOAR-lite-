@@ -1,0 +1,40 @@
+services:
+  soar:
+    image: soar-suricata:${SOAR_IMAGE_TAG:-latest}
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    container_name: soar-suricata
+
+    restart: unless-stopped
+
+    # Required because Wazuh Indexer is currently reached through
+    # https://127.0.0.1:9200 and the SOAR manages host iptables.
+    network_mode: host
+
+    # Required for adding/removing iptables rules.
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+
+    env_file:
+      - /etc/soar-lite.env
+
+    environment:
+      SOAR_BASE_DIR: /data
+      SURICATA_LOG_PATH: /var/log/suricata/eve.json
+      PYTHONUNBUFFERED: "1"
+
+    volumes:
+      # Suricata log access.
+      - /var/log/suricata:/var/log/suricata:ro
+
+      # Persistent blocked IPs, seen alerts and incident logs.
+      - /home/shuhari/soar-lite:/data
+
+      # Persistent AI reports.
+      - ./reports:/app/reports
+
+      # Keep container time aligned with Debian host.
+      - /etc/localtime:/etc/localtime:ro

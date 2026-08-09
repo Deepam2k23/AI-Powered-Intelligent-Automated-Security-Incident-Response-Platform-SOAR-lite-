@@ -1,0 +1,14 @@
+.git
+.gitignore
+.env
+*.env
+__pycache__/
+*.pyc
+*.pyo
+*.log
+reports/
+soar.py.backup
+soar.py.backup2
+Dockerfile.jenkins
+jenkins_home/
+config.py.backup_before_docker
