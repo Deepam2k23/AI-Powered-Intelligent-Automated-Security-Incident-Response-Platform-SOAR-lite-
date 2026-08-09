@@ -1,223 +1,941 @@
-# 🛡️ AI-Powered Intelligent Automated Security Incident Response Platform (SOAR-lite)
+# AI-Powered Intelligent Automated Security Incident Response Platform (SOAR-lite)
 
-An end-to-end **Security Orchestration, Automation and Response (SOAR)** mini-platform that detects, enriches, scores, and automatically responds to security incidents in real time — with AI-generated incident reports powered by **Gemini 2.5 Flash**.
+An AI-powered Security Operations Center (SOC) automation platform that combines **Wazuh SIEM, Suricata IDS, Elastic Stack, Threat Intelligence APIs, Python-based incident response automation, and AI-assisted reporting** to detect, analyze, enrich, prioritize, contain, and report security incidents.
 
-Built as a hands-on SOC engineering project combining **SIEM, IDS, log analytics, threat intelligence, automated response, and DevSecOps** practices into a single working pipeline.
+The project is designed as a practical SOC lab environment using **VMware Workstation and Debian 12**, with **Kali Linux** used to simulate real-world cyberattacks.
 
 ---
 
-## 📌 Overview
+## 📌 Project Overview
 
-This project simulates a realistic SOC (Security Operations Center) environment where an attacker (Kali Linux) performs an SSH brute-force attack against a target Debian 12 server. The attack is detected by **Wazuh SIEM**, correlated and cross-checked with **Suricata IDS** alerts, enriched using threat intelligence APIs, scored by a decision engine, and automatically remediated — all while pushing logs into an **ELK Stack** for visibility and notifications to **Slack/Email**. An AI-generated summary of the incident is created using the **Gemini 2.5 Flash** model for human-readable reporting.
+The platform automates the security incident lifecycle from **attack detection to incident reporting and response**.
 
-> ⚠️ Note: No LLM is used for detection, correlation, or decision-making logic — those are fully rule/score based. Gemini 2.5 Flash is used **only** for generating natural-language incident summary reports after the fact.
+A typical workflow is:
+
+```text
+Kali Linux
+    │
+    │ Simulated Attack
+    ▼
+Target / Monitored Host
+    │
+    │ Logs
+    ▼
+Wazuh Agent + Suricata IDS
+    │
+    │ Alerts / Events
+    ▼
+Wazuh Manager
+    │
+    │ Alert JSON / API
+    ▼
+Python SOAR Automation Engine
+    │
+    ├── Alert Processing
+    ├── IOC Extraction
+    ├── Threat Intelligence Enrichment
+    │      ├── VirusTotal API
+    │      └── AbuseIPDB API
+    │
+    ├── AI-based Analysis / Risk Scoring
+    ├── Decision Engine
+    │
+    ├── Automated Response
+    │      └── iptables / UFW
+    │
+    ├── Incident Logging
+    │      └── SQLite
+    │
+    ├── AI Incident Report Generation
+    │
+    └── Notifications
+           ├── Slack
+           └── SMTP Email
+
+                │
+                ▼
+        Elasticsearch
+                │
+             Logstash
+                │
+             Kibana
+                │
+                ▼
+       Security Dashboards
+       Threat Hunting / Analytics
+```
 
 ---
 
 ## 🏗️ Architecture
 
-![SOAR-lite Architecture Diagram](./architecture-diagram.png)
+The core platform is deployed using **three Debian 12 virtual machines on VMware Workstation**.
 
-### Flow Summary
+### VM-1 — ELK Server
 
-1. **Threat Actor** — Kali Linux attacker performs reconnaissance (Nmap port/service scans) followed by an SSH brute-force attack (Hydra / Ncrack / Medusa) against the target.
-2. **Target Server** — Debian 12 victim server running OpenSSH, Wazuh Agent, and iptables/UFW, generating `auth.log` events. Suricata IDS also inspects network traffic on this host and flags Nmap scan signatures (SYN/Connect/UDP scans, OS fingerprinting).
-3. **Monitoring & Log Collection** — Wazuh Agent collects logs, performs file integrity monitoring, and forwards events over a secure channel (TCP 1514) to the Wazuh Manager.
-4. **SIEM (Wazuh Manager)** — Performs log analysis, rule correlation, and MITRE ATT&CK mapping, generating **Detected Alerts** for both reconnaissance and brute force activity (e.g., Suricata Nmap scan alert mapped to T1046, and Rule ID 5710 — Multiple SSH Failed Logins mapped to T1110).
-5. **Automation Playbook (SOAR-lite, Python)**:
-   1. Read alert from Wazuh (API / Alerts JSON)
-   2. Extract IoC (Source IP, Host, Rule)
-   3. Threat Intelligence lookup / enrichment
-   4. Decision engine (score ≥ threshold?)
-   5. Response actions (block IP via iptables)
-   6. Notifications (Slack / Email)
-   7. Incident logging (store & update in SQLite)
-6. **Integrations**:
-   - **Threat Intelligence APIs** — AbuseIPDB (reputation score), VirusTotal (malicious reports)
-   - **Firewall / Response Action** — iptables/UFW auto-blocks the malicious IP
-   - **Notification Channels** — Slack Webhook, Email (SMTP)
-7. **Incident Storage & Logging** — All incident data (time, source IP, host, attack type, MITRE technique, score, action taken, status) stored in SQLite/JSON.
-8. **Visibility / Dashboard** — Wazuh Dashboard + custom ELK (Elasticsearch, Logstash, Kibana) dashboards for incident summaries, attack trends, and response actions.
-9. **AI Reporting Layer** — Gemini 2.5 Flash converts structured incident data into a clear, human-readable incident report for analysts/management.
+**Operating System:** Debian 12
+
+Dedicated to centralized security log management and visualization.
+
+Components:
+
+- Elasticsearch
+- Logstash
+- Kibana
+
+Responsibilities:
+
+- Receive and process security logs
+- Store centralized security events
+- Index security data
+- Provide dashboards and visualization
+- Support threat hunting and log analysis
 
 ---
 
-## ⚙️ Tech Stack
+### VM-2 — Wazuh + Suricata Server
 
-| Category | Technology |
+**Operating System:** Debian 12
+
+This VM provides the primary security monitoring and detection layer.
+
+Components:
+
+- Wazuh Manager
+- Wazuh Agent
+- Suricata IDS
+
+Responsibilities:
+
+- Collect security logs
+- Monitor authentication and system events
+- Detect network-based attacks
+- Generate IDS alerts
+- Correlate security events
+- Map events to MITRE ATT&CK techniques
+- Forward alerts to the SOAR automation engine
+
+---
+
+### VM-3 — SOAR + AI Automation Server
+
+**Operating System:** Debian 12
+
+This VM hosts the Python-based automated incident response platform.
+
+Components:
+
+- Python SOAR automation engine
+- Decision engine
+- IOC extraction
+- Threat intelligence enrichment
+- AI-based analysis and reporting
+- SQLite incident database
+- Slack notification integration
+- SMTP email integration
+- Automated response actions
+
+Responsibilities:
+
+- Read Wazuh alerts
+- Extract Indicators of Compromise (IOCs)
+- Query external threat intelligence services
+- Calculate incident risk
+- Make response decisions
+- Block malicious IP addresses
+- Store incident information
+- Generate AI-assisted incident reports
+- Notify SOC/security personnel
+
+---
+
+### Attack Simulation — Kali Linux
+
+**Operating System:** Kali Linux
+
+Kali Linux is used to simulate real-world attacks against the monitored environment.
+
+Example tools include:
+
+- Hydra
+- Ncrack
+- Medusa
+- Nmap
+- Other penetration-testing/security tools
+
+Example attack:
+
+```text
+Kali Linux
+     │
+     │ SSH Brute Force
+     ▼
+Debian Target Server
+     │
+     ▼
+Wazuh + Suricata
+     │
+     ▼
+SOAR Automation
+     │
+     ▼
+Threat Intelligence
+     │
+     ▼
+Risk Decision
+     │
+     ▼
+iptables / UFW
+     │
+     ▼
+Malicious IP Blocked
+```
+
+---
+
+## 🔄 Incident Response Workflow
+
+### 1. Attack Simulation
+
+Kali Linux generates a controlled security event against the monitored target.
+
+For example:
+
+```text
+SSH Brute Force Attack
+```
+
+### 2. Detection
+
+Suricata detects network activity while Wazuh monitors system and authentication logs.
+
+Example event:
+
+```text
+Rule ID: 5710
+Description: Multiple SSH Failed Logins
+Source IP: 192.168.1.105
+Host: debian-target
+```
+
+### 3. Alert Collection
+
+The Wazuh Manager processes and correlates the event and generates an alert.
+
+The Python SOAR platform retrieves the alert through the Wazuh API / alert JSON.
+
+### 4. IOC Extraction
+
+The automation engine extracts relevant Indicators of Compromise such as:
+
+- Source IP
+- Destination IP
+- Host
+- Port
+- Rule ID
+- Attack type
+- File/hash indicators where applicable
+
+### 5. Threat Intelligence Enrichment
+
+The extracted indicators are submitted to external threat intelligence services.
+
+#### VirusTotal
+
+Used to obtain malicious/benign reputation and security intelligence for indicators.
+
+#### AbuseIPDB
+
+Used to evaluate IP reputation and abuse confidence information.
+
+The enrichment results are incorporated into the incident risk evaluation.
+
+### 6. AI-Based Analysis and Risk Scoring
+
+The platform performs AI-assisted analysis to:
+
+- Summarize the incident
+- Identify suspicious behavior
+- Analyze contextual information
+- Assist with risk prioritization
+- Generate actionable security insights
+- Reduce manual SOC analysis effort
+
+### 7. Decision Engine
+
+The decision engine evaluates the collected evidence and determines whether automated containment should be performed.
+
+Conceptually:
+
+```text
+Threat Intelligence
+        +
+Wazuh Severity
+        +
+Attack Context
+        +
+AI Analysis
+        │
+        ▼
+   Risk Score
+        │
+        ▼
+  Decision Engine
+        │
+   ┌────┴────┐
+   │         │
+ Low Risk   High Risk
+   │         │
+ Monitor    Respond
+             │
+             ▼
+        Block Malicious IP
+```
+
+### 8. Automated Response
+
+For high-confidence malicious activity, the platform can automatically block the source IP using Linux firewall controls such as:
+
+```bash
+iptables -A INPUT -s <MALICIOUS_IP> -j DROP
+```
+
+UFW can also be used depending on the host configuration.
+
+### 9. Incident Logging
+
+Incident details are stored in SQLite.
+
+Example information:
+
+| Field | Example |
 |---|---|
-| Automation / Playbook | Python |
-| SIEM | Wazuh SIEM |
-| IDS | Suricata IDS |
-| Log Analytics | Elasticsearch, Logstash, Kibana (ELK Stack) |
-| Threat Intelligence | VirusTotal API, AbuseIPDB API |
-| Response / Firewall | iptables |
-| Storage | SQLite |
-| Notifications | Slack API, SMTP (Email) |
-| AI Reporting | Gemini 2.5 Flash |
-| CI/CD & Version Control | Jenkins, Git, GitHub |
-| Attack Simulation | Kali Linux (Nmap, Hydra / Ncrack / Medusa) |
-| OS / Infra | Debian 12 (x2 servers), VMware Workstation |
+| Time | 2025-05-27 10:30:15 |
+| Source IP | 192.168.1.105 |
+| Host | debian-target |
+| Attack Type | SSH Brute Force |
+| MITRE Technique | T1110 |
+| Risk Score | 95 |
+| Action | IP Blocked |
+| Status | Success |
 
----
+### 10. AI Incident Report
 
-## 🖥️ Lab Environment
+The platform generates an AI-assisted incident report containing information such as:
 
-| Machine | Role | OS |
-|---|---|---|
-| Server 1 | Target host — OpenSSH, Wazuh Agent, iptables, Suricata | Debian 12 |
-| Server 2 | ELK Stack (Elasticsearch, Logstash, Kibana) | Debian 12 |
-| Attacker | Attack simulation (SSH brute force) | Kali Linux |
+- Incident summary
+- Detection source
+- Source IP / IOC
+- Attack type
+- Threat intelligence findings
+- Risk assessment
+- MITRE ATT&CK mapping
+- Response action
+- Recommended remediation
+- Incident status
 
-All machines were provisioned as separate VMs on **VMware Workstation**, networked together to simulate a realistic segmented SOC lab.
+### 11. Notifications
 
----
+Security personnel can receive automated notifications through:
 
-## 🚀 Key Features
+- Slack API / Webhook
+- SMTP Email
 
-- ✅ Real-time log collection & correlation via Wazuh SIEM
-- ✅ Network-based threat detection via Suricata IDS, including **Nmap scan detection** (SYN scan, Connect scan, service/OS fingerprinting attempts) via custom IDS signatures
-- ✅ Instant Slack + Email alerting for reconnaissance activity (Nmap scans) as well as brute-force incidents
-- ✅ MITRE ATT&CK technique mapping for detected alerts (e.g., T1046 — Network Service Discovery, T1110 — Brute Force)
-- ✅ Automated IoC extraction from raw alerts
-- ✅ Threat intelligence enrichment (AbuseIPDB reputation score, VirusTotal reports)
-- ✅ Configurable scoring/decision engine for auto-response threshold
-- ✅ Automated malicious IP blocking via iptables
-- ✅ Real-time Slack and Email notifications
-- ✅ Centralized incident logging (SQLite/JSON) with full audit trail
-- ✅ ELK-based dashboards for attack trend visibility
-- ✅ AI-generated (Gemini 2.5 Flash) human-readable incident summary reports
-- ✅ Jenkins-driven DevSecOps pipeline for playbook testing/deployment
+This allows incidents to be reported without requiring continuous manual monitoring.
 
----
+### 12. Centralized Logging and Visualization
 
-## 📂 Project Structure
+Security logs are forwarded to the Elastic Stack:
 
-```
-soar-lite/
-├── playbook/
-│   ├── read_alert.py           # Fetch alerts from Wazuh API
-│   ├── extract_ioc.py          # Extract Source IP / Host / Rule from alert
-│   ├── threat_intel.py         # AbuseIPDB + VirusTotal enrichment
-│   ├── decision_engine.py      # Scoring & threshold-based decision logic
-│   ├── response_action.py      # iptables auto-block execution
-│   ├── notify.py               # Slack + SMTP email notifications
-│   └── incident_logger.py      # SQLite incident storage & updates
-│   └── soar.py                 # orchestrating all the files
-├── Dockerfile            # for Generating Docker Image   
-├── ai_report/
-│   └── ai_report.py      # Gemini 2.5 Flash incident report generation
-├── suricata/
-│   ├── suricata.yaml            # IDS rules & config
-│   └── nmap-detection.rules     # Custom rules for Nmap scan detection
-├── wazuh/
-│   └── custom_rules.xml        # Custom Wazuh detection rules
-├── elk/
-│   ├── logstash.conf
-│   └── kibana_dashboards/
-├── jenkins/
-│   └── Jenkinsfile             # CI/CD pipeline for the playbook
-├── db/
-│   └── incidents.db            # SQLite incident database
-├── requirements.txt
-└── README.md
+```text
+Security Logs
+     │
+     ▼
+ Logstash
+     │
+     ▼
+Elasticsearch
+     │
+     ▼
+  Kibana
 ```
 
+Kibana can be used for:
+
+- Security dashboards
+- Incident visualization
+- Attack trend analysis
+- Log investigation
+- Threat hunting
+- Event correlation
+
 ---
 
-## 🔧 Setup & Installation
+## 🧩 Project Components
+
+| Component | Purpose |
+|---|---|
+| `main.py` | Main SOAR execution workflow |
+| `alert_reader.py` | Reads/obtains security alerts |
+| `decision_engine.py` | Determines appropriate response |
+| `ioc_extractor.py` | Extracts indicators of compromise |
+| `threat_intel.py` | Threat intelligence enrichment |
+| `incident_logger.py` | Stores incident information |
+| `response_action.py` | Executes automated response actions |
+| `notifier.py` | Sends Slack/Email notifications |
+| `ai_report.py` | AI-assisted incident analysis/report generation |
+| `config.py` | Application configuration and environment variables |
+| `wazuh_client.py` | Wazuh API communication |
+| `storage.py` | Incident storage functionality |
+| `Dockerfile` | Container image definition |
+| `docker-compose.yml` | Container orchestration |
+| `Jenkinsfile` | CI/CD pipeline configuration |
+| `requirements.txt` | Python dependencies |
+| `reports/` | Generated incident reports |
+| `Playbook/` | SOAR playbook resources |
+
+---
+
+## 🛠️ Technology Stack
+
+### Operating Systems & Virtualization
+
+- Debian 12
+- Kali Linux
+- VMware Workstation
+
+### Security Monitoring
+
+- Wazuh SIEM
+- Suricata IDS
+- MITRE ATT&CK
+
+### Programming & Automation
+
+- Python
+- Bash / Linux commands
+- Automated incident response
+
+### Threat Intelligence
+
+- VirusTotal API
+- AbuseIPDB API
+
+### Response & Containment
+
+- iptables
+- UFW
+
+### Logging & SIEM
+
+- Elasticsearch
+- Logstash
+- Kibana
+
+### Storage
+
+- SQLite
+- JSON
+
+### Notifications
+
+- Slack API
+- SMTP Email
+
+### DevSecOps / Source Control
+
+- Git
+- GitHub
+- Jenkins
+- Docker
+- Docker Compose
+
+---
+
+## 🔐 Security & Configuration
+
+Sensitive credentials are **not stored directly in the source code**.
+
+Environment variables are used for credentials and API keys.
+
+Examples include:
+
+```bash
+GEMINI_API_KEY
+VT_KEY
+ABUSEIPDB_API_KEY
+WAZUH_USER
+WAZUH_PASSWORD
+SMTP_PASS
+```
+
+The application reads configuration values using Python environment-variable access such as:
+
+```python
+import os
+
+api_key = os.getenv("GEMINI_API_KEY")
+```
+
+For a production deployment, use a dedicated secrets-management solution instead of storing secrets in plain-text system configuration.
+
+### Recommended `.gitignore`
+
+```gitignore
+__pycache__/
+*.py[cod]
+
+.env
+.env.*
+!.env.example
+
+secrets/
+secrets.py
+secrets.json
+
+*.pem
+*.key
+
+*.bak
+*.backup
+*.backup_*
+
+venv/
+.venv/
+
+.vscode/
+.idea/
+
+*.log
+```
+
+**Never commit API keys, passwords, private keys, tokens, or other credentials to GitHub.**
+
+---
+
+## 🚀 Installation & Setup
 
 ### Prerequisites
-- 2x Debian 12 servers (target + ELK stack)
-- 1x Kali Linux VM (attack simulation)
-- Python 3.10+
-- Wazuh Manager & Agent installed
-- Suricata IDS installed on target
-- ELK Stack (Elasticsearch, Logstash, Kibana) on the second server
-- API keys: AbuseIPDB, VirusTotal, Gemini API, Slack Webhook, SMTP credentials
 
-### Installation
+Install/configure:
+
+- VMware Workstation
+- Debian 12 VMs
+- Kali Linux
+- Python 3
+- Wazuh
+- Suricata
+- Elasticsearch
+- Logstash
+- Kibana
+- Git
+- Docker / Docker Compose
+- Jenkins
+
+### Clone the Repository
 
 ```bash
-# Clone the repository
-git clone https://github.com/<your-username>/AI-Powered-Intelligent-Automated-Security-Incident-Response-Platform-SOAR-lite.git
-cd AI-Powered-Intelligent-Automated-Security-Incident-Response-Platform-SOAR-lite
+git clone https://github.com/Deepam2k23/AI-Powered-Intelligent-Automated-Security-Incident-Response-Platform-SOAR-lite-.git
+cd AI-Powered-Intelligent-Automated-Security-Incident-Response-Platform-SOAR-lite-
+```
 
-# Install Python dependencies
+### Create a Python Virtual Environment
+
+```bash
+python3 -m venv venv
+source venv/bin/activate
+```
+
+### Install Dependencies
+
+```bash
 pip install -r requirements.txt
-
-# Configure environment variables / secrets
-cp .env.example .env
-# Fill in: ABUSEIPDB_API_KEY, VIRUSTOTAL_API_KEY, GEMINI_API_KEY,
-#          SLACK_WEBHOOK_URL, SMTP_HOST, SMTP_USER, SMTP_PASS,
-#          WAZUH_API_URL, WAZUH_API_USER, WAZUH_API_PASS
-
-# Run the playbook (triggered manually or via Wazuh active response)
-python3 playbook/main.py
 ```
 
-### Attack Simulation (from Kali Linux)
+### Configure Environment Variables
+
+Set the required variables in the operating system environment.
+
+For example:
 
 ```bash
-# Reconnaissance — Nmap scan (triggers Suricata Nmap-detection rules)
-nmap -sS -sV -O <target-ip>
-
-# SSH brute force (triggers Wazuh Rule 5710)
-hydra -l root -P rockyou.txt ssh://<target-ip>
+export GEMINI_API_KEY="your-key"
+export VT_KEY="your-key"
+export ABUSEIPDB_API_KEY="your-key"
 ```
 
-The Nmap scan is picked up by Suricata's port-scan/service-discovery signatures and forwarded to Wazuh, which raises an alert and pushes a Slack/Email notification for the reconnaissance attempt. The subsequent SSH brute-force attempt generates multiple failed SSH login attempts on the target, which Wazuh correlates into a single alert (Rule ID 5710) that triggers the full SOAR-lite playbook (enrichment → scoring → auto-block → notification → logging).
+For persistent system-wide configuration on Debian, environment variables can be configured through the appropriate system environment configuration.
+
+Verify that variables are available without exposing their values:
+
+```bash
+if [ -n "$GEMINI_API_KEY" ]; then echo "GEMINI_API_KEY is set"; fi
+```
+
+### Run the SOAR Application
+
+The exact entry point depends on the configured deployment mode. For a direct Python execution:
+
+```bash
+python3 main.py
+```
+
+or, if the project workflow uses the SOAR orchestrator:
+
+```bash
+python3 soar.py
+```
+
+---
+
+## 🐳 Docker Deployment
+
+The project includes:
+
+```text
+Dockerfile
+docker-compose.yml
+```
+
+Build the application:
+
+```bash
+docker build -t soar-lite .
+```
+
+Run with Docker Compose:
+
+```bash
+docker compose up -d
+```
+
+Check containers:
+
+```bash
+docker ps
+```
+
+Stop the stack:
+
+```bash
+docker compose down
+```
+
+---
+
+## 🔄 CI/CD
+
+A Jenkins pipeline is included through:
+
+```text
+Jenkinsfile
+```
+
+The intended workflow is:
+
+```text
+Developer
+    │
+    ▼
+Git
+    │
+    ▼
+GitHub
+    │
+    ▼
+Jenkins
+    │
+    ├── Checkout
+    ├── Validation
+    ├── Security/Secret Checks
+    ├── Build
+    └── Deployment
+         │
+         ▼
+     SOAR Platform
+```
+
+Jenkins can be integrated with Docker to build and deploy the SOAR application.
+
+---
+
+## 🧪 Example Incident
+
+### Scenario
+
+Kali Linux performs an SSH brute-force attack against the monitored Debian server.
+
+```text
+Kali Linux
+     │
+     │ SSH Brute Force
+     ▼
+Debian Target
+     │
+     ├── auth.log
+     └── Suricata events
+             │
+             ▼
+        Wazuh Agent
+             │
+             ▼
+        Wazuh Manager
+             │
+             ▼
+       Python SOAR
+             │
+             ├── Extract Source IP
+             │
+             ├── VirusTotal
+             │
+             ├── AbuseIPDB
+             │
+             ├── AI Analysis
+             │
+             ├── Risk Score
+             │
+             └── Decision
+                    │
+                    ▼
+              IP Blocked
+                    │
+             ┌──────┴──────┐
+             ▼             ▼
+          SQLite        Slack/Email
+             │
+             ▼
+        AI Report
+             │
+             ▼
+      Elasticsearch
+             │
+             ▼
+          Kibana
+```
 
 ---
 
 ## 🧠 MITRE ATT&CK Mapping
 
-| Technique ID | Name | Detection Source |
-|---|---|---|
-| T1046 | Network Service Discovery (Nmap scan) | Suricata IDS |
-| T1110 | Brute Force | Wazuh (SSH failed logins) + Suricata |
+The platform can associate detected behavior with MITRE ATT&CK techniques.
 
-The playbook tags every stored incident with its mapped MITRE technique for traceability and reporting.
+Example:
 
----
+```text
+SSH Brute Force
+      │
+      ▼
+T1110 — Brute Force
+```
 
-## 📊 Sample Incident Record
-
-| Time | Source IP | Host | Attack Type | MITRE Technique | Score | Action Taken | Status |
-|---|---|---|---|---|---|---|---|
-| 2025-05-27 10:28:02 | 192.168.1.105 | debian-target | Nmap Port/Service Scan | T1046 (Network Service Discovery) | 40 | Slack + Email Alert Sent | Logged |
-| 2025-05-27 10:30:15 | 192.168.1.105 | debian-target | SSH Brute Force | T1110 (Brute Force) | 95 | IP Blocked | Success |
+MITRE ATT&CK mapping helps security analysts understand attacker behavior using a standardized adversary-technique framework.
 
 ---
 
-## 🤖 AI-Powered Incident Reporting
+## 📊 Benefits
 
-Once an incident is logged, the platform sends the structured incident record (source IP, host, MITRE technique, score, action taken, timestamps, TI enrichment results) to **Gemini 2.5 Flash**, which generates a concise, analyst-friendly narrative summary of the incident — used for daily SOC reports and management updates. The AI is used strictly for **report generation/summarization**, not for detection or response decisions.
+The platform provides:
 
----
-
-## 🔄 DevSecOps / CI-CD
-
-A **Jenkins** pipeline automates linting, testing, and deployment of the playbook code on every push to GitHub, ensuring the automation logic stays reliable as new detection rules and integrations are added.
-
----
-
-## 📈 Future Enhancements
-
-- Auto-unblock IPs after a cooldown period
-- Multi-host / multi-agent correlation for distributed attacks
-- Integration with SOAR platforms like TheHive/Cortex
-- Expanded MITRE ATT&CK technique coverage (beyond brute force)
-- Web-based dashboard for playbook management
-
----
-
-## 👤 Author
-
-Built as a hands-on SOC Analyst / Blue Team portfolio project demonstrating end-to-end detection-to-response automation, threat intelligence integration, and DevSecOps practices.
+- Automated security alert processing
+- Real-time threat detection
+- IOC extraction
+- Threat intelligence enrichment
+- AI-assisted incident analysis
+- Automated risk prioritization
+- Automated IP containment
+- Incident logging
+- Centralized security logs
+- Threat hunting support
+- Interactive security dashboards
+- Automated Slack notifications
+- Automated email reporting
+- AI-generated incident reports
+- Reduced manual SOC workload
+- Improved incident response speed
 
 ---
 
-## 📜 License
+## 🎯 Key Features
 
-This project is intended for educational and portfolio purposes. Use responsibly in isolated lab environments only.
+### Detection
+
+- Wazuh SIEM
+- Suricata IDS
+- Authentication log monitoring
+- Security event correlation
+- MITRE ATT&CK mapping
+
+### Analysis
+
+- IOC extraction
+- VirusTotal enrichment
+- AbuseIPDB reputation
+- AI-assisted analysis
+- Risk scoring
+- Incident summarization
+
+### Response
+
+- Automatic malicious-IP blocking
+- iptables/UFW integration
+- Incident state tracking
+- Automated notifications
+
+### Reporting
+
+- SQLite incident storage
+- AI-generated incident reports
+- Slack notifications
+- SMTP email notifications
+- Elastic Stack visualization
+
+---
+
+## 📁 Repository Structure
+
+```text
+soar_suricata_new/
+│
+├── ai_report.py
+├── config.py
+├── decision.py
+├── enrichment.py
+├── notifier.py
+├── response.py
+├── soar.py
+├── storage.py
+├── wazuh_client.py
+│
+├── alert_reader.py
+├── decision_engine.py
+├── incident_logger.py
+├── ioc_extractor.py
+├── main.py
+├── response_action.py
+├── threat_intel.py
+│
+├── Dockerfile
+├── docker-compose.yml
+├── Jenkinsfile
+├── requirements.txt
+├── .gitignore
+│
+├── Playbook/
+├── reports/
+│
+└── __pycache__/        # Generated; should not be committed
+```
+
+> The exact file list may vary depending on the active version of the SOAR implementation. Generated files such as `__pycache__`, `.pyc`, logs, backups, and local secrets should be excluded through `.gitignore`.
+
+---
+
+## 🗺️ Architecture Diagram
+
+<img width="1536" height="1024" alt="AI-Powered Intelligent Automated Security Incident Response_Architecture" src="https://github.com/user-attachments/assets/87fe2999-bc30-4eda-b307-04700eb1cf57" />
+
+
+
+The project architecture consists of:
+
+1. **Threat Actor** — Kali Linux
+2. **Target Server** — Debian 12
+3. **Monitoring & Log Collection** — Wazuh Agent / Suricata
+4. **SIEM** — Wazuh Manager
+5. **Automation Playbook** — Python SOAR-lite
+6. **Integrations** — VirusTotal / AbuseIPDB
+7. **Incident Storage & Logging** — SQLite / Elastic Stack
+8. **Notifications & Visibility** — Slack / SMTP / Kibana
+
+The architecture demonstrates an end-to-end automated SOC workflow:
+
+```text
+Attack
+  ↓
+Detection
+  ↓
+Alert Collection
+  ↓
+IOC Extraction
+  ↓
+Threat Intelligence
+  ↓
+AI Analysis
+  ↓
+Risk Scoring
+  ↓
+Decision Engine
+  ↓
+Automated Response
+  ↓
+Incident Logging
+  ↓
+AI Report
+  ↓
+Notification + Dashboard
+```
+
+---
+
+## 🔮 Future Enhancements
+
+Potential improvements include:
+
+- Automated malware analysis
+- SOAR web dashboard
+- More response playbooks
+- Automated host isolation
+- Active Directory integration
+- EDR integration
+- Additional threat intelligence feeds
+- Machine-learning-based anomaly detection
+- Advanced correlation rules
+- Case management
+- Role-based access control
+- Kubernetes deployment
+- Cloud-native SOC deployment
+- Secrets management with Vault
+- OpenTelemetry integration
+- Automated MITRE ATT&CK coverage reporting
+
+---
+
+## ⚠️ Disclaimer
+
+This project is intended for **educational, research, cybersecurity lab, and authorized security testing purposes**.
+
+Only perform attack simulations against systems and networks that you own or have explicit permission to test.
+
+Do not use the automated response functionality against unauthorized systems.
+
+---
+
+## 👨‍💻 Project Summary
+
+**AI-Powered Intelligent Automated Security Incident Response Platform (SOAR-lite)** demonstrates practical implementation of modern SOC and DevSecOps concepts by integrating:
+
+**Python + Wazuh + Suricata + VirusTotal + AbuseIPDB + AI + iptables + SQLite + Elasticsearch + Logstash + Kibana + Slack + SMTP + Jenkins + Docker + Git/GitHub**
+
+The platform automates the complete security incident lifecycle from **threat detection and alert ingestion through IOC enrichment, AI-assisted risk analysis, automated containment, incident logging, notification, and report generation**.
+
+---
+
+## ⭐ Project Highlights
+
+- AI-assisted SOC automation
+- Automated incident response
+- Wazuh SIEM integration
+- Suricata IDS integration
+- Threat intelligence enrichment
+- VirusTotal API integration
+- AbuseIPDB API integration
+- MITRE ATT&CK-based analysis
+- Automated firewall response
+- SQLite incident management
+- Elastic Stack centralized logging
+- Kibana security visualization
+- Slack and SMTP notifications
+- Dockerized deployment
+- Jenkins CI/CD integration
+- Git/GitHub version control
+- VMware-based multi-VM SOC lab
