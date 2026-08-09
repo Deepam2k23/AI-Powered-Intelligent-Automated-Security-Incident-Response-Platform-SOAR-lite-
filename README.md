@@ -103,8 +103,10 @@ soar-lite/
 │   ├── response_action.py      # iptables auto-block execution
 │   ├── notify.py               # Slack + SMTP email notifications
 │   └── incident_logger.py      # SQLite incident storage & updates
+│   └── soar.py                 # orchestrating all the files
+├── Dockerfile            # for Generating Docker Image   
 ├── ai_report/
-│   └── generate_report.py      # Gemini 2.5 Flash incident report generation
+│   └── ai_report.py      # Gemini 2.5 Flash incident report generation
 ├── suricata/
 │   ├── suricata.yaml            # IDS rules & config
 │   └── nmap-detection.rules     # Custom rules for Nmap scan detection
